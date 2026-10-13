@@ -5,9 +5,10 @@ on:
     branches: [ main ]
     tags:
       - 'v*'
-  pull_request:
-    branches: [ main ]
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -30,12 +31,10 @@ jobs:
           D8_TOOL=$(find /usr/local/lib/android/sdk/build-tools -name "d8" | sort -V | tail -n 1)
           
           if [ -z "$ANDROID_JAR" ]; then
-            echo "android.jar not found, searching system..."
             ANDROID_JAR=$(find $ANDROID_HOME/platforms -name "android.jar" | sort -V | tail -n 1)
           fi
           
           if [ -z "$D8_TOOL" ]; then
-            echo "d8 tool not found, searching system..."
             D8_TOOL=$(find $ANDROID_HOME/build-tools -name "d8" | sort -V | tail -n 1)
           fi
 
@@ -58,9 +57,10 @@ jobs:
           name: classes.dex
           path: classes.dex
 
-      - name: Create GitHub Release (DEX Only)
-        if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+      - name: Publish Release (DEX Only)
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: latest
+          name: "AyuMode DEX (Latest Build)"
+          body: "Автоматическая сборка classes.dex для плагина AyuMode."
           files: classes.dex
-          generate_release_notes: true
