@@ -2,6 +2,7 @@ package com.exterawkey.ayumode;
 
 import android.content.Context;
 import android.view.Window;
+import java.util.List;
 
 public class AyuModeBridge {
     public static final String VERSION = "1.0.0";
@@ -27,8 +28,8 @@ public class AyuModeBridge {
         BypassController.cleanWindow(window);
     }
 
-    public static void onMessageDeleted(long dialogId, int messageId) {
-        MessageSaver.onMessageDeleted(dialogId, messageId);
+    public static void onMessageDeleted(long dialogId, int messageId, String text, long fromId) {
+        MessageSaver.onMessageDeleted(dialogId, messageId, text, fromId);
     }
 
     public static boolean isMessageDeleted(long dialogId, int messageId) {
@@ -39,8 +40,16 @@ public class AyuModeBridge {
         MessageSaver.onMessageEdited(dialogId, messageId, previousText, timestamp);
     }
 
-    public static void setConfig(String key, boolean val) {
+    public static List<MessageSaver.EditedMessageEntry> getEditHistory(long dialogId, int messageId) {
+        return MessageSaver.getEditHistory(dialogId, messageId);
+    }
+
+    public static void setConfigBool(String key, boolean val) {
         AyuModeConfig.setBool(key, val);
+    }
+
+    public static void setConfigInt(String key, int val) {
+        AyuModeConfig.setInt(key, val);
     }
 
     public static String getVersion() {

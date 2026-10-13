@@ -1,6 +1,6 @@
 __id__ = "ayumode"
 __name__ = "AyuMode"
-__description__ = "Функционал AyuGram в exteraGram: Призрак, сохранение сообщений, обход скриншотов и защиты контента"
+__description__ = "Полный функционал AyuGram в exteraGram: Призрак, сохранение удалённых сообщений, обход скриншотов и защиты"
 __author__ = "wKey ( @exterawKey )"
 __version__ = "1.0.0"
 __icon__ = "msg_stealth"
@@ -51,17 +51,26 @@ class SendRequestHook(MethodHook):
                     "TL_messages_readDiscussion",
                     "TL_messages_readSavedHistory",
                     "TL_messages_readEncryptedHistory",
+                    "TL_messages_readMentions",
+                    "TL_messages_readReactions",
                 ):
                     param.setResult(0)
                     return
 
             if plugin.get_setting("typing_ghost", True):
-                if name == "TL_messages_setTyping":
+                if name in (
+                    "TL_messages_setTyping",
+                    "TL_messages_setEncryptedTyping",
+                    "TL_channels_setTyping",
+                ):
                     param.setResult(0)
                     return
 
             if plugin.get_setting("stories_ghost", True):
-                if name == "TL_stories_readStories":
+                if name in (
+                    "TL_stories_readStories",
+                    "TL_stories_incrementStoryViews",
+                ):
                     param.setResult(0)
                     return
 
@@ -204,15 +213,22 @@ class AyuModePlugin(BasePlugin):
             "online_ghost",
             "stories_ghost",
             "voice_video_ghost",
-            "bypass_flag_secure",
-            "force_download_media",
+            "send_offline_after_action",
+            "mark_read_on_send",
             "save_deleted_messages",
             "save_edited_messages",
+            "save_media_ttl",
+            "save_for_bots",
+            "save_exact_read_date",
+            "save_local_online",
+            "bypass_flag_secure",
+            "force_download_media",
+            "semi_transparent_deleted",
         ]
         for k in keys:
             try:
                 val = self.get_setting(k, True)
-                self._bridge.setConfig(k, bool(val))
+                self._bridge.setConfigBool(k, bool(val))
             except Exception:
                 pass
 
@@ -220,13 +236,13 @@ class AyuModePlugin(BasePlugin):
         self._deleted_messages.add(f"{dialog_id}_{message_id}")
         if self._bridge:
             try:
-                self._bridge.onMessageDeleted(dialog_id, message_id)
+                self._bridge.onMessageDeleted(dialog_id, message_id, "", 0)
             except Exception:
                 pass
 
     def create_settings(self) -> List[Any]:
         return [
-            Header(text="AyuMode — Функции AyuGram"),
+            Header(text="👻 Режим призрака (AyuGhost)"),
             Switch(
                 key="ghost_mode",
                 text="Режим призрака",
@@ -236,74 +252,125 @@ class AyuModePlugin(BasePlugin):
             ),
             Switch(
                 key="read_messages_ghost",
-                text="Нечиталка сообщений",
+                text="Не читать сообщения",
                 default=True,
                 subtext="Не отправлять статус прочтения при открытии чата",
                 icon="msg_views",
             ),
             Switch(
                 key="typing_ghost",
-                text="Скрывать статус печатает",
+                text="Скрывать статус «печатает...»",
                 default=True,
-                subtext="Собеседник не видит когда вы набираете текст",
+                subtext="Собеседник не видит набор текста, запись голосовых и отправку медиа",
                 icon="msg_edit",
             ),
             Switch(
                 key="online_ghost",
-                text="Скрывать статус онлайн",
+                text="Скрывать статус «в сети»",
                 default=True,
-                subtext="Не обновлять время в сети при использовании клиента",
+                subtext="Не обновлять онлайн при открытии и использовании клиента",
                 icon="msg_user",
             ),
             Switch(
                 key="stories_ghost",
                 text="Невидимка в историях",
                 default=True,
-                subtext="Просмотр историй без отображения в списке зрителей",
+                subtext="Просмотр историй без отображения в списке зрителей автора",
                 icon="msg_stories",
             ),
             Switch(
                 key="voice_video_ghost",
                 text="Невидимка в голосовых и видео",
                 default=True,
-                subtext="Не отмечать прослушивание голосовых и просмотр видеосообщений",
+                subtext="Не отмечать прослушивание голосовых и просмотр кружочков",
                 icon="msg_voice",
             ),
-            Divider(),
-            Header(text="Обход ограничений"),
             Switch(
-                key="bypass_flag_secure",
-                text="Скриншоты везде",
+                key="send_offline_after_action",
+                text="Оффлайн после действий",
                 default=True,
-                subtext="Разрешить скриншоты и запись экрана в защищённых чатах",
-                icon="msg_permissions",
+                subtext="Сразу отправлять статус не в сети после отправки сообщений",
+                icon="msg_retry",
             ),
             Switch(
-                key="force_download_media",
-                text="Скачивание из закрытых каналов",
-                default=True,
-                subtext="Разрешить сохранение медиа при запрете сохранения контента",
-                icon="msg_download",
+                key="mark_read_on_send",
+                text="Прочитать при ответе",
+                default=False,
+                subtext="Отмечать входящие сообщения прочитанными только когда вы сами отвечаете",
+                icon="msg_send",
             ),
             Divider(),
-            Header(text="Шпионские функции"),
+            Header(text="🕵️‍♂️ Шпионские функции (AyuSpy)"),
             Switch(
                 key="save_deleted_messages",
                 text="Сохранять удалённые сообщения",
                 default=True,
-                subtext="Не удалять сообщения из чата если собеседник их стёр",
+                subtext="Удалённые собеседником сообщения остаются в чате",
                 icon="msg_delete",
             ),
             Switch(
                 key="save_edited_messages",
                 text="История изменений сообщений",
                 default=True,
-                subtext="Сохранять исходный текст если сообщение отредактировали",
+                subtext="Сохранять первоначальный текст при редактировании сообщений",
                 icon="msg_history",
+            ),
+            Switch(
+                key="save_media_ttl",
+                text="Сохранять самоуничтожающиеся медиа",
+                default=True,
+                subtext="Таймерные фото и видео не исчезают после просмотра",
+                icon="msg_secret",
+            ),
+            Switch(
+                key="save_for_bots",
+                text="Сохранять сообщения ботов",
+                default=False,
+                subtext="Не удалять сообщения и инлайн-клавиатуры от ботов",
+                icon="msg_bot",
+            ),
+            Switch(
+                key="save_exact_read_date",
+                text="Фиксировать время прочтения",
+                default=True,
+                subtext="Запоминать точную дату и время прочтения сообщения собеседником",
+                icon="msg_calendar",
+            ),
+            Switch(
+                key="save_local_online",
+                text="Локальный трекер онлайна",
+                default=True,
+                subtext="Сохранять в базу точное время последнего онлайна пользователей",
+                icon="msg_log",
+            ),
+            Divider(),
+            Header(text="🔓 Обход ограничений (Bypass)"),
+            Switch(
+                key="bypass_flag_secure",
+                text="Скриншоты везде",
+                default=True,
+                subtext="Снятие FLAG_SECURE для скриншотов и записи экрана в защищённых чатах",
+                icon="msg_permissions",
+            ),
+            Switch(
+                key="force_download_media",
+                text="Скачивание из закрытых каналов",
+                default=True,
+                subtext="Принудительное скачивание медиа при запрете сохранения контента",
+                icon="msg_download",
+            ),
+            Divider(),
+            Header(text="🎨 Кастомизация"),
+            Switch(
+                key="semi_transparent_deleted",
+                text="Полупрозрачные удалённые сообщения",
+                default=True,
+                subtext="Отображать удалённые сообщения с лёгкой прозрачностью",
+                icon="msg_customize",
             ),
             Divider(),
             Header(text="О плагине"),
             Text(text="AyuMode v1.0.0 (DEX Engine + Python Bridge)", icon="msg_info"),
             Text(text="Автор: wKey ( @exterawKey )", icon="msg_contacts"),
-            Text(text="GitHub: github.com/exterawKey/AyuMode", icon="msg_link"),
+            Text(text="Релизы classes.dex: github.com/exterawKey/AyuMode", icon="msg_link"),
         ]

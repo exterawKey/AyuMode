@@ -3,12 +3,28 @@ package com.exterawkey.ayumode;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class MessageSaver {
-    private static final Set<String> deletedMessageKeys = Collections.newSetFromMap(new ConcurrentHashMap<String, Boolean>());
-    private static final ConcurrentHashMap<String, List<EditedMessageEntry>> editedHistory = new ConcurrentHashMap<String, List<EditedMessageEntry>>();
+    private static final Map<String, DeletedMessageInfo> deletedMessages = new ConcurrentHashMap<String, DeletedMessageInfo>();
+    private static final Map<String, List<EditedMessageEntry>> editedHistory = new ConcurrentHashMap<String, List<EditedMessageEntry>>();
+
+    public static class DeletedMessageInfo {
+        public final long dialogId;
+        public final int messageId;
+        public final long deletedTime;
+        public final String text;
+        public final long fromId;
+
+        public DeletedMessageInfo(long dialogId, int messageId, String text, long fromId) {
+            this.dialogId = dialogId;
+            this.messageId = messageId;
+            this.deletedTime = System.currentTimeMillis();
+            this.text = text != null ? text : "";
+            this.fromId = fromId;
+        }
+    }
 
     public static class EditedMessageEntry {
         public final String text;
@@ -24,14 +40,18 @@ public class MessageSaver {
         return dialogId + "_" + messageId;
     }
 
-    public static void onMessageDeleted(long dialogId, int messageId) {
+    public static void onMessageDeleted(long dialogId, int messageId, String text, long fromId) {
         if (!AyuModeConfig.saveDeletedMessages) return;
-        deletedMessageKeys.add(makeKey(dialogId, messageId));
+        deletedMessages.put(makeKey(dialogId, messageId), new DeletedMessageInfo(dialogId, messageId, text, fromId));
     }
 
     public static boolean isDeleted(long dialogId, int messageId) {
         if (!AyuModeConfig.saveDeletedMessages) return false;
-        return deletedMessageKeys.contains(makeKey(dialogId, messageId));
+        return deletedMessages.containsKey(makeKey(dialogId, messageId));
+    }
+
+    public static DeletedMessageInfo getDeletedInfo(long dialogId, int messageId) {
+        return deletedMessages.get(makeKey(dialogId, messageId));
     }
 
     public static void onMessageEdited(long dialogId, int messageId, String previousText, long timestamp) {
@@ -45,13 +65,13 @@ public class MessageSaver {
         history.add(new EditedMessageEntry(previousText, timestamp));
     }
 
-    public static List<EditedMessageEntry> getHistory(long dialogId, int messageId) {
+    public static List<EditedMessageEntry> getEditHistory(long dialogId, int messageId) {
         List<EditedMessageEntry> list = editedHistory.get(makeKey(dialogId, messageId));
         return list != null ? new ArrayList<EditedMessageEntry>(list) : Collections.<EditedMessageEntry>emptyList();
     }
 
     public static void clear() {
-        deletedMessageKeys.clear();
+        deletedMessages.clear();
         editedHistory.clear();
     }
 }
