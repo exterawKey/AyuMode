@@ -8,12 +8,16 @@ __app_version__ = ">=12.5.1"
 __sdk_version__ = ">=1.4.0"
 
 import os
+import threading
+import urllib.request
 from typing import Any, List
 
 from base_plugin import BasePlugin, MethodHook
 from hook_utils import find_class
 from ui.bulletin import BulletinHelper
 from ui.settings import Divider, Header, Switch, Text
+
+DEX_RELEASE_URL = "https://github.com/exterawKey/AyuMode/releases/latest/download/classes.dex"
 
 
 class SendRequestHook(MethodHook):
@@ -140,7 +144,7 @@ class AyuModePlugin(BasePlugin):
         self._deleted_messages = set()
 
     def on_plugin_load(self):
-        self._init_dex_bridge()
+        self._ensure_dex_loaded()
 
         conn_mgr = find_class("org.telegram.tgnet.ConnectionsManager")
         if conn_mgr:
@@ -159,7 +163,7 @@ class AyuModePlugin(BasePlugin):
         except Exception:
             pass
 
-    def _init_dex_bridge(self):
+    def _ensure_dex_loaded(self):
         try:
             AppLoader = find_class("org.telegram.messenger.ApplicationLoader")
             if not AppLoader:
@@ -168,21 +172,41 @@ class AyuModePlugin(BasePlugin):
             if not context:
                 return
 
-            candidates = [
-                os.path.join(os.path.dirname(__file__), "classes.dex"),
-                os.path.join(str(context.getFilesDir()), "ayumode", "classes.dex"),
-                "/sdcard/Download/classes.dex",
-            ]
+            ayumode_dir = os.path.join(str(context.getFilesDir()), "ayumode")
+            os.makedirs(ayumode_dir, exist_ok=True)
+            dex_path = os.path.join(ayumode_dir, "classes.dex")
 
-            dex_path = None
-            for p in candidates:
-                if os.path.exists(p):
-                    dex_path = p
-                    break
-
-            if not dex_path:
+            if os.path.exists(dex_path) and os.path.getsize(dex_path) > 1024:
+                self._load_dex(context, dex_path)
                 return
 
+            def download_dex_worker():
+                try:
+                    temp_path = dex_path + ".tmp"
+                    req = urllib.request.Request(
+                        DEX_RELEASE_URL,
+                        headers={"User-Agent": "exteraGram-AyuMode"}
+                    )
+                    with urllib.request.urlopen(req, timeout=30) as resp:
+                        data = resp.read()
+                        if len(data) > 1024:
+                            with open(temp_path, "wb") as f:
+                                f.write(data)
+                            os.replace(temp_path, dex_path)
+                            self._load_dex(context, dex_path)
+                            try:
+                                BulletinHelper.show_success("AyuMode: DEX успешно загружен с GitHub")
+                            except Exception:
+                                pass
+                except Exception:
+                    pass
+
+            threading.Thread(target=download_dex_worker, daemon=True).start()
+        except Exception:
+            pass
+
+    def _load_dex(self, context: Any, dex_path: str):
+        try:
             DexClassLoader = find_class("dalvik.system.DexClassLoader")
             File = find_class("java.io.File")
             if not DexClassLoader or not File:
@@ -370,7 +394,7 @@ class AyuModePlugin(BasePlugin):
             ),
             Divider(),
             Header(text="О плагине"),
-            Text(text="AyuMode v1.0.0 (DEX Engine + Python Bridge)", icon="msg_info"),
+            Text(text="AyuMode v1.0.0 (DEX Engine + Auto-Download)", icon="msg_info"),
             Text(text="Автор: wKey ( @exterawKey )", icon="msg_contacts"),
-            Text(text="Релизы classes.dex: github.com/exterawKey/AyuMode", icon="msg_link"),
+            Text(text="Релизы DEX: github.com/exterawKey/AyuMode", icon="msg_link"),
         ]
