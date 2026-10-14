@@ -19,7 +19,8 @@ public class GhostController {
                     || "TL_messages_readSavedHistory".equals(className)
                     || "TL_messages_readEncryptedHistory".equals(className)
                     || "TL_messages_readMentions".equals(className)
-                    || "TL_messages_readReactions".equals(className)) {
+                    || "TL_messages_readReactions".equals(className)
+                    || "TL_messages_markDialogUnread".equals(className)) {
                 return true;
             }
         }
@@ -40,7 +41,8 @@ public class GhostController {
         }
 
         if (AyuModeConfig.voiceVideoGhost) {
-            if ("TL_messages_readMessageContents".equals(className)) {
+            if ("TL_messages_readMessageContents".equals(className)
+                    || "TL_channels_readMessageContents".equals(className)) {
                 return true;
             }
         }
